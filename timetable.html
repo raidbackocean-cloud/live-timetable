@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- iPhone用フルスクリーン設定 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="タイムテーブル">
+    <title>Live Timetable Pro</title>
+    <style>
+        :root {
+            --bg: #f5f5f7; --card-bg: #ffffff; --input-bg: rgba(0, 0, 0, 0.05); 
+            --accent-main: #007aff; --accent-soft: #e5f1ff; --accent-deep: #0056b3; 
+            --text-main: #1d1d1f; --text-dim: #86868b; --time-color: #007aff; --border: #d2d2d7;
+            --danger: #ff3b30; --safe: #34c759;
+        }
+        [data-theme="dark"] {
+            --bg: #1a1c1e; --card-bg: #25282c; --input-bg: rgba(255, 255, 255, 0.1);
+            --accent-main: #0a84ff; --accent-soft: #1c1c1e; --accent-deep: #64d2ff;
+            --text-main: #f5f5f7; --text-dim: #a1a1a6; --time-color: #64d2ff; --border: #3d4249;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+            background: var(--bg); color: var(--text-main); max-width: 950px; margin: auto; padding: 15px; line-height: 1.4; transition: background 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+            /* iPhoneのセーフエリア（ノッチ部分）対応 */
+            padding-top: calc(15px + env(safe-area-inset-top));
+        }
+
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number], input[type=text], input[type=date] { 
+            -moz-appearance: textfield;
+            /* iPhoneで入力時にズームさせないために16px以上に設定 */
+            font-size: 16px !important; 
+        }
+
+        .header-controls { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .theme-toggle-btn { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-main); cursor: pointer; font-size: 0.8em; font-weight: bold; }
+        .btn-reset { background: var(--danger); color: white; border: none; padding: 6px 14px; border-radius: 8px; font-size: 0.85em; cursor: pointer; font-weight: bold; }
+        
+        .card { background: var(--card-bg); padding: 25px; border-radius: 20px; margin-bottom: 15px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .input-title { font-size: 1.8em; color: var(--accent-main); font-weight: bold; width: 100%; background: transparent; border: none; outline: none; }
+        .input-sub { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; flex: 1; outline: none; }
+        
+        .event-info-grid { display: flex; gap: 10px; margin-top: 10px; }
+
+        .custom-select {
+            background: var(--input-bg); border: 1px solid var(--border); color: var(--accent-main);
+            padding: 8px 10px; border-radius: 10px; font-size: 16px; font-weight: bold; font-family: monospace;
+            cursor: pointer; outline: none; appearance: none; text-align: center; min-width: 55px;
+        }
+
+        .usage-container { display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap; }
+        .usage-box { flex: 1; min-width: 140px; padding: 12px; border-radius: 12px; text-align: center; border: 1px solid var(--border); background: var(--input-bg); }
+        .usage-box span { display: block; font-size: 0.7em; font-weight: bold; color: var(--text-dim); margin-bottom: 2px; }
+        .usage-box div { font-size: 1.2em; font-weight: bold; font-family: monospace; color: var(--accent-main); }
+        .usage-box.alert { background: var(--danger) !important; border-color: #b06a6a; }
+        .usage-box.alert div, .usage-box.alert span { color: #fff !important; }
+
+        .controls-card { background: var(--card-bg); padding: 15px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border: 1px solid var(--border); }
+        
+        .tabs { display: flex; gap: 4px; }
+        .tab { padding: 12px; cursor: pointer; background: rgba(0,0,0,0.05); border-radius: 10px 10px 0 0; border: none; color: var(--text-dim); font-weight: bold; flex: 1; font-size: 0.9em; }
+        .tab.active { background: var(--card-bg); color: var(--accent-main); border-top: 3px solid var(--accent-main); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+        
+        .table-container { 
+            background: var(--card-bg); border-radius: 0 12px 12px 12px; border: 1px solid var(--border); 
+            overflow-x: auto; -webkit-overflow-scrolling: touch; /* iPhone用ヌルヌルスクロール */
+        }
+        table { width: 100%; border-collapse: collapse; min-width: 500px; }
+        th { background: rgba(0,0,0,0.02); color: var(--text-dim); font-size: 0.7em; padding: 10px 5px; border-bottom: 1px solid var(--border); text-align: center; }
+        td { padding: 12px 5px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        
+        .time-display { font-family: monospace; color: var(--time-color); white-space: nowrap; text-align: center; }
+        .time-start { font-size: 1.3em; font-weight: bold; }
+        .time-end { font-size: 0.8em; opacity: 0.6; display: block; margin-top: -4px; }
+        .name-input { font-size: 16px; color: var(--text-main); background: transparent; border: none; outline: none; width: 100%; padding: 4px 0; }
+        .input-dark { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 5px; border-radius: 6px; width: 50px; text-align: center; font-weight: bold; outline: none; font-size: 16px; }
+        .btn-add { background: var(--accent-main); color: white; width: 100%; padding: 18px; border-radius: 15px; font-weight: bold; border: none; margin-top: 15px; font-size: 1.1em; cursor: pointer; }
+        .btn-del { color: var(--text-dim); font-size: 1.5em; background: none; border: none; padding: 10px; cursor: pointer; }
+        .drag-handle { cursor: grab; color: var(--border); font-size: 1.5em; padding: 0 10px; }
+        .dragging { opacity: 0.5; background: var(--accent-soft); }
+
+        @media screen and (max-width: 600px) {
+            .input-title { font-size: 1.4em !important; }
+            .event-info-grid { flex-direction: column; }
+            .controls-card { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-controls">
+        <button class="btn-reset" onclick="resetData()">全データ削除</button>
+        <button class="theme-toggle-btn" onclick="toggleTheme()" id="themeBtn">ダークモードへ</button>
+    </div>
+
+    <div class="card">
+        <input type="text" id="eventTitle" class="input-title" placeholder="イベント名" oninput="saveInfoOnly()">
+        <div class="event-info-grid">
+            <input type="date" id="eventDate" class="input-sub" oninput="saveInfoOnly()">
+            <input type="text" id="eventPlace" class="input-sub" placeholder="📍 会場" oninput="saveInfoOnly()">
+            <input type="text" id="eventOrganizer" class="input-sub" placeholder="👤 主催" oninput="saveInfoOnly()">
+        </div>
+        <div class="usage-container">
+            <div class="usage-box"><span>総利用時間</span><div id="totalUsageDisplay">00:00</div></div>
+            <div class="usage-box">
+                <span>規定時間</span>
+                <div style="display:flex; align-items:center; justify-content:center; gap:4px;">
+                    <select id="limitH" class="custom-select" onchange="saveLimit()"></select>
+                    <span>:</span>
+                    <select id="limitM" class="custom-select" onchange="saveLimit()"></select>
+                </div>
+            </div>
+            <div id="statusBox" class="usage-box"><span id="statusLabel">規定内</span><div id="diffDisplay">00:00</div></div>
+        </div>
+    </div>
+
+    <div class="controls-card">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size:0.75em; font-weight:bold; color:var(--text-dim);">🚪 OPEN</label>
+            <select id="doorH" class="custom-select" onchange="saveDoorTime()"></select>
+            <select id="doorM" class="custom-select" onchange="saveDoorTime()"></select>
+            <div style="margin-left:5px; border-left:1px solid var(--border); padding-left:10px;">
+                <span id="topCloseTimeDisplay" style="font-size: 1.2em; color: var(--accent-main); font-weight: bold; font-family: monospace;">--:--</span>
+            </div>
+        </div>
+        <div style="font-size: 0.8em; color: var(--text-dim); display: flex; align-items: center; gap: 5px;">
+            演奏:<select id="batchPlay" class="custom-select"></select>
+            転換:<select id="batchChange" class="custom-select"></select>
+            <button onclick="applyBatch()" style="background:var(--accent-main); color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:bold;">一括適用</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" id="btn-performance" onclick="switchTab('performance')">本番</button>
+        <button class="tab" id="btn-rehearsal" onclick="switchTab('rehearsal')">リハ</button>
+    </div>
+
+    <div class="table-container">
+        <table><tbody id="tableBody"></tbody></table>
+    </div>
+
+    <button class="btn-add" onclick="addItem()">+ 枠を追加</button>
+
+    <script>
+        const STORAGE_KEY = 'live_data_v28';
+        const INFO_KEY = 'live_info_v28';
+        const THEME_KEY = 'theme_v28';
+        const DOOR_KEY = 'doorTime_v28';
+        const LIMIT_H_KEY = 'limitH_v28';
+        const LIMIT_M_KEY = 'limitM_v28';
+        const CLOSE_KEY = 'closeDur_v28';
+        
+        let currentTab = 'performance';
+        let doorTime = localStorage.getItem(DOOR_KEY) || "17:30";
+        let closeDur = parseInt(localStorage.getItem(CLOSE_KEY)) || 40;
+        let limitH = parseInt(localStorage.getItem(LIMIT_H_KEY)) || 9;
+        let limitM = parseInt(localStorage.getItem(LIMIT_M_KEY)) || 0;
+        
+        let data = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+            performance: [{ name: "バンド 1", play: 30, change: 10 }, { name: "バンド 2", play: 30, change: 10 }, { name: "バンド 3", play: 30, change: 10 }],
+            rehearsal: [{ name: "バンド 3", play: 20, change: 10, no: "トリ" }, { name: "バンド 2", play: 20, change: 10, no: "2" }, { name: "バンド 1", play: 20, change: 10, no: "1" }]
+        };
+
+        function initSelects() {
+            const dh = document.getElementById('doorH'); const dm = document.getElementById('doorM');
+            const lh = document.getElementById('limitH'); const lm = document.getElementById('limitM');
+            const bp = document.getElementById('batchPlay'); const bc = document.getElementById('batchChange');
+            
+            dh.innerHTML = dm.innerHTML = lh.innerHTML = lm.innerHTML = bp.innerHTML = bc.innerHTML = "";
+
+            for(let i=0; i<24; i++) {
+                let opt = i.toString().padStart(2,'0');
+                dh.add(new Option(opt, opt)); lh.add(new Option(opt, opt));
+            }
+            for(let i=0; i<125; i+=5) {
+                let opt = i.toString().padStart(2,'0');
+                if(i < 60) { dm.add(new Option(opt, opt)); lm.add(new Option(opt, opt)); }
+                bp.add(new Option(i, i)); bc.add(new Option(i, i));
+            }
+
+            let [h, m] = doorTime.split(':');
+            dh.value = h; dm.value = m;
+            lh.value = limitH.toString().padStart(2,'0');
+            lm.value = limitM.toString().padStart(2,'0');
+            bp.value = "30"; bc.value = "10";
+        }
+
+        function resetData() {
+            const currentTheme = localStorage.getItem(THEME_KEY); 
+            localStorage.clear(); 
+            if(currentTheme) localStorage.setItem(THEME_KEY, currentTheme); 
+            location.reload();
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.dataset.theme;
+            const target = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.dataset.theme = target;
+            localStorage.setItem(THEME_KEY, target);
+            document.getElementById('themeBtn').innerText = target === 'dark' ? 'ライトモードへ' : 'ダークモードへ';
+        }
+        document.documentElement.dataset.theme = localStorage.getItem(THEME_KEY) || 'light';
+
+        function saveDoorTime() {
+            doorTime = `${document.getElementById('doorH').value}:${document.getElementById('doorM').value}`;
+            localStorage.setItem(DOOR_KEY, doorTime);
+            render();
+        }
+        
+        function saveLimit() { 
+            limitH = parseInt(document.getElementById('limitH').value); 
+            limitM = parseInt(document.getElementById('limitM').value); 
+            localStorage.setItem(LIMIT_H_KEY, limitH); localStorage.setItem(LIMIT_M_KEY, limitM); 
+            renderTimesOnly(); 
+        }
+
+        function switchTab(t) { currentTab = t; document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.id === 'btn-'+t)); render(); }
+        
+        function addItem() {
+            const p = parseInt(document.getElementById('batchPlay').value);
+            const c = parseInt(document.getElementById('batchChange').value);
+            data.performance.push({name: "", play: p, change: c});
+            data.rehearsal.unshift({name: "", play: 20, change: 10, no: ""});
+            refreshAllNos(); saveAndRender();
+        }
+
+        function deleteItem(i) {
+            if (currentTab === 'performance') { data.performance.splice(i, 1); data.rehearsal.splice(data.rehearsal.length - 1 - i, 1); } 
+            else { data.rehearsal.splice(i, 1); data.performance.splice(data.performance.length - 1 - i, 1); }
+            refreshAllNos(); saveAndRender();
+        }
+
+        function refreshAllNos() {
+            const pNames = data.performance.map(it => it.name);
+            const revNames = [...pNames].reverse();
+            data.rehearsal.forEach((it, i) => {
+                it.name = revNames[i] || "";
+                const pIdx = data.performance.length - i;
+                it.no = (pIdx === data.performance.length) ? "トリ" : pIdx.toString();
+            });
+        }
+
+        function updateField(i, f, v) { 
+            if(f==='name'){ 
+                data[currentTab][i].name = v;
+                if(currentTab === 'performance'){
+                    const rIdx = data.rehearsal.length - 1 - i;
+                    if(data.rehearsal[rIdx]) data.rehearsal[rIdx].name = v;
+                } else {
+                    const pIdx = data.performance.length - 1 - i;
+                    if(data.performance[pIdx]) data.performance[pIdx].name = v;
+                }
+            }
+            else if(f==='no') data[currentTab][i].no = v; 
+            else data[currentTab][i][f] = parseInt(v) || 0;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); renderTimesOnly();
+        }
+
+        function updateCloseDur(v) { closeDur = parseInt(v)||0; localStorage.setItem(CLOSE_KEY, closeDur); renderTimesOnly(); }
+        function saveInfoOnly() { 
+            const info = { title: document.getElementById('eventTitle').value, date: document.getElementById('eventDate').value, place: document.getElementById('eventPlace').value, organizer: document.getElementById('eventOrganizer').value }; 
+            localStorage.setItem(INFO_KEY, JSON.stringify(info)); 
+        }
+
+        function saveAndRender() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); render(); }
+
+        function initDragAndDrop() {
+            const tbody = document.getElementById('tableBody');
+            // タッチデバイス用のドラッグ＆ドロップ対応が必要な場合はライブラリを推奨しますが、
+            // 標準機能を強化
+            tbody.addEventListener('dragstart', (e) => { if(e.target.tagName==='TR') e.target.classList.add('dragging'); });
+            tbody.addEventListener('dragover', (e) => {
+                e.preventDefault(); const d = document.querySelector('.dragging'); if(!d) return;
+                const r = e.target.closest('tr'); if(r && r!==d && r.dataset.index){
+                    const b = r.getBoundingClientRect(); if(e.clientY - b.top > b.height/2) r.after(d); else r.before(d);
+                }
+            });
+            tbody.addEventListener('dragend', () => {
+                const rows = Array.from(tbody.querySelectorAll('tr[data-index]'));
+                if(!rows.length) return;
+                const newData = rows.map(r => data[currentTab][parseInt(r.dataset.index)]);
+                if(currentTab === 'performance'){ data.performance = newData; } 
+                else { data.rehearsal = newData; data.performance = [...newData].reverse(); }
+                refreshAllNos(); saveAndRender();
+            });
+        }
+
+        function render() {
+            const info = JSON.parse(localStorage.getItem(INFO_KEY))||{};
+            document.getElementById('eventTitle').value = info.title||""; document.getElementById('eventDate').value = info.date||""; document.getElementById('eventPlace').value = info.place||""; document.getElementById('eventOrganizer').value = info.organizer||"";
+            const body = document.getElementById('tableBody'); body.innerHTML = `<tr><th></th><th>予定</th><th>No</th><th>内容</th><th>演奏</th><th>転換</th><th>✕</th></tr>`;
+            if (currentTab === 'performance') {
+                body.innerHTML += `<tr style="background:rgba(0,0,0,0.02)"><td></td><td class="time-display"><span class="time-start">${doorTime}</span><span class="time-end">OPEN</span></td><td>-</td><td>🚪 OPEN</td><td>30</td><td>0</td><td></td></tr>`;
+                data.performance.forEach((it, i) => {
+                    const no = (i === data.performance.length-1) ? "トリ" : (i+1);
+                    body.innerHTML += `<tr draggable="true" data-index="${i}"><td class="drag-handle">☰</td><td class="time-display" id="time-${i}">-</td><td style="text-align:center;font-weight:bold;">${no}</td><td><input type="text" value="${it.name}" class="name-input" oninput="updateField(${i},'name',this.value)"></td><td><input type="number" class="input-dark" value="${it.play}" oninput="updateField(${i},'play',this.value)"></td><td><input type="number" class="input-dark" value="${it.change}" oninput="updateField(${i},'change',this.value)"></td><td><button class="btn-del" onclick="deleteItem(${i})">✕</button></td></tr>`;
+                });
+                body.innerHTML += `<tr style="background:rgba(0,0,0,0.02)"><td></td><td class="time-display" id="time-close">-</td><td>-</td><td>🧹 撤収</td><td><input type="number" class="input-dark" value="${closeDur}" oninput="updateCloseDur(this.value)"></td><td>0</td><td></td></tr>`;
+            } else {
+                body.innerHTML += `<tr style="background:rgba(0,0,0,0.02)"><td></td><td class="time-display" id="time-staff">-</td><td>-</td><td>⚙️ 入り</td><td>15</td><td>0</td><td></td></tr>`;
+                data.rehearsal.forEach((it, i) => {
+                    body.innerHTML += `<tr draggable="true" data-index="${i}"><td class="drag-handle">☰</td><td class="time-display" id="time-${i}">-</td><td><input type="text" value="${it.no||''}" style="width:40px; background:transparent; border:none; text-align:center; color:var(--text-dim); font-size:16px;" oninput="updateField(${i},'no',this.value)"></td><td><input type="text" value="${it.name}" class="name-input" oninput="updateField(${i},'name',this.value)"></td><td><input type="number" class="input-dark" value="${it.play}" oninput="updateField(${i},'play',this.value)"></td><td><input type="number" class="input-dark" value="${it.change}" oninput="updateField(${i},'change',this.value)"></td><td><button class="btn-del" onclick="deleteItem(${i})">✕</button></td></tr>`;
+                });
+                body.innerHTML += `<tr style="background:rgba(0,0,0,0.02)"><td></td><td class="time-display" id="time-meeting">-</td><td>-</td><td>🤝 挨拶</td><td>10</td><td>0</td><td></td></tr>`;
+            }
+            renderTimesOnly(); initDragAndDrop();
+        }
+
+        function renderTimesOnly() {
+            let pCur = addMin(doorTime, 30); data.performance.forEach(it => { let e = addMin(pCur, it.play); pCur = addMin(e, it.change); });
+            let final = addMin(pCur, closeDur); document.getElementById('topCloseTimeDisplay').innerText = final;
+            if (currentTab === 'performance') {
+                let cur = addMin(doorTime, 30); data.performance.forEach((it, i) => { const el = document.getElementById(`time-${i}`); let e = addMin(cur, it.play); if(el) el.innerHTML = `<span class="time-start">${cur}</span><span class="time-end">〜${e}</span>`; cur = addMin(e, it.change); });
+                const cl = document.getElementById('time-close'); if(cl) cl.innerHTML = `<span class="time-start">${cur}</span><span class="time-end">〜${final}</span>`;
+            } else {
+                let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
+                let fs = addMin(doorTime, -tr);
+                const st = document.getElementById('time-staff'); if(st) st.innerHTML = `<span class="time-start">${addMin(fs,-15)}</span><span class="time-end">〜${fs}</span>`;
+                let cur = fs; data.rehearsal.forEach((it, i) => { const el = document.getElementById(`time-${i}`); let e = addMin(cur, it.play); if(el) el.innerHTML = `<span class="time-start">${cur}</span><span class="time-end">〜${e}</span>`; cur = addMin(e, it.change); });
+                const me = document.getElementById('time-meeting'); if(me) me.innerHTML = `<span class="time-start">${cur}</span><span class="time-end">〜${doorTime}</span>`;
+            }
+            let rT = 25; data.rehearsal.forEach(it => rT += it.play + it.change); let pT = 30 + closeDur; data.performance.forEach(it => pT += it.play + it.change);
+            const total = rT + pT; document.getElementById('totalUsageDisplay').innerText = `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+            const limit = (limitH*60)+limitM; const diff = total-limit;
+            const sb = document.getElementById('statusBox'); const sl = document.getElementById('statusLabel'); const dd = document.getElementById('diffDisplay');
+            if(diff > 0){ sb.classList.add('alert'); sl.innerText="超過"; dd.innerText=`${String(Math.floor(diff/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`; }
+            else { sb.classList.remove('alert'); sl.innerText="あと"; let rem = Math.abs(diff); dd.innerText=`${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`; }
+        }
+
+        function addMin(t, m) { let [h, min] = t.split(':').map(Number); let d = new Date(); d.setHours(h, min + m); return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0'); }
+
+        function applyBatch() { 
+            const p = parseInt(document.getElementById('batchPlay').value);
+            const c = parseInt(document.getElementById('batchChange').value); 
+            data[currentTab].forEach(it => { it.play=p; it.change=c; }); 
+            saveAndRender(); 
+        }
+
+        initSelects(); render();
+        document.getElementById('themeBtn').innerText = document.documentElement.dataset.theme === 'dark' ? 'ライトモードへ' : 'ダークモードへ';
+    </script>
+</body>
+</html>
