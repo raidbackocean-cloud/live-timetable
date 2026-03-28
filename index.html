@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Timetable Pro v34.1</title>
+    <title>Live Timetable Pro v34.2</title>
     <style>
         :root {
             --bg: #f2f2f7; --card: #ffffff; --accent: #007aff;
@@ -32,8 +32,8 @@
         input[type="text"] { border: none; background: transparent; font-size: 15px; color: inherit; outline: none; width: 100%; font-weight: bold; }
         ::placeholder { color: var(--dim); opacity: 0.6; font-weight: normal; }
 
-        .header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-        .btn-header { background: none; border: none; font-size: 0.75em; font-weight: bold; color: var(--dim); cursor: pointer; padding: 5px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 10px; position: relative; z-index: 10; }
+        .btn-header { background: none; border: none; font-size: 0.75em; font-weight: bold; color: var(--dim); cursor: pointer; padding: 10px 5px; }
         .main-card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .input-title { font-size: 1.3em !important; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid var(--bg) !important; }
         
@@ -107,11 +107,14 @@
     let door = localStorage.getItem(K.DOOR) || "17:30", limit = localStorage.getItem(K.LIM) || "09:00";
     let bPlay = localStorage.getItem(K.BPLAY) || 30, bChange = localStorage.getItem(K.BCHANGE) || 10;
     
-    let data = JSON.parse(localStorage.getItem(K.DATA)) || {
+    // 初期データの定義
+    const initialData = {
         performance: Array.from({length:3}, (_,i)=>({name:`バンド ${i+1}`, play:30, change:10})),
         rehearsal: Array.from({length:3}, (_,i)=>({name:`バンド ${i+1}`, play:20, change:10, no:(3-i).toString()}))
     };
-    if(!localStorage.getItem(K.DATA) && data.rehearsal) data.rehearsal[data.rehearsal.length-1].no = "トリ";
+    initialData.rehearsal[initialData.rehearsal.length-1].no = "トリ";
+
+    let data = JSON.parse(localStorage.getItem(K.DATA)) || JSON.parse(JSON.stringify(initialData));
 
     function init() {
         const info = JSON.parse(localStorage.getItem(K.INFO)) || {};
@@ -135,8 +138,8 @@
             const wh = document.getElementById('wheelH'), wm = document.getElementById('wheelM');
             wh.innerHTML = '<div></div>'; for(let i=0;i<24;i++) wh.innerHTML += `<div>${i.toString().padStart(2,'0')}</div>`; wh.innerHTML += '<div></div>';
             wm.innerHTML = '<div></div>'; for(let i=0;i<60;i+=5) wm.innerHTML += `<div>${i.toString().padStart(2,'0')}</div>`; wm.innerHTML += '<div></div>';
-            let cur = (key==='door'?door:limit).split(':');
-            wh.scrollTop = parseInt(cur) * 50; wm.scrollTop = (parseInt(cur)/5) * 50;
+            let [h, m] = (key==='door'?door:limit).split(':');
+            wh.scrollTop = parseInt(h) * 50; wm.scrollTop = (parseInt(m)/5) * 50;
         } else {
             wheels.innerHTML = `<div id="wheelV" class="wheel" style="width:120px;"></div>`;
             const wv = document.getElementById('wheelV');
@@ -168,7 +171,7 @@
         const container = document.getElementById('listBody'); container.innerHTML = "";
         let [dH, dM] = door.split(':').map(Number);
         if (currentTab === 'performance') {
-            container.innerHTML += `<div class="row sys"><div class="c-start">${door}</div><div class="c-no">-</div><div class="c-name">開場</div><div class="c-end-group"><div class="c-end"></div></div></div>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${door}</div><div class="c-no">-</div><div class="c-name">開場</div><div class="c-end-group"></div></div>`;
             let cur = dH * 60 + dM + 30; 
             data.performance.forEach((it, i) => {
                 let s = fmt(cur), e = fmt(cur + it.play);
@@ -176,7 +179,7 @@
                     <div class="row-main">
                         <div class="c-start">${s}</div>
                         <div class="c-no">${(i===data.performance.length-1)?'トリ':i+1}</div>
-                        <div class="c-name"><input type="text" value="${it.name}" onchange="updName(${i},this.value)"></div>
+                        <div class="c-name"><input type="text" value="${it.name||''}" onchange="updName(${i},this.value)"></div>
                         <div class="c-end-group">
                             <span class="label-min">持</span><div class="picker-btn" onclick="openPicker('min','play',${i})">${it.play}</div>
                             <span class="label-min">転</span><div class="picker-btn" onclick="openPicker('min','change',${i})">${it.change}</div>
@@ -193,7 +196,7 @@
             let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
             let fs = (dH * 60 + dM) - tr;
             document.getElementById('entryDisp').innerText = fmt(fs-15);
-            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(fs-15)}</div><div class="c-no">-</div><div class="c-name">入り <span style="font-size:10px">～15分～</span></div><div class="c-end-group"><div class="c-end">${fmt(fs)}</div></div></div>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(fs-15)}</div><div class="c-no">-</div><div class="c-name">入り <span style="font-size:10px">～15分～</span></div><div class="c-end-group"></div></div>`;
             let cur = fs;
             data.rehearsal.forEach((it, i) => {
                 let s = fmt(cur), e = fmt(cur + it.play);
@@ -201,7 +204,7 @@
                     <div class="row-main">
                         <div class="c-start">${s}</div>
                         <div class="c-no"><input type="text" value="${it.no||''}" style="width:100%;text-align:center;font-size:11px;color:var(--accent);font-weight:bold" onchange="data.rehearsal[${i}].no=this.value;syncAndCalc()"></div>
-                        <div class="c-name"><input type="text" value="${it.name}" onchange="updName(${i},this.value)"></div>
+                        <div class="c-name"><input type="text" value="${it.name||''}" onchange="updName(${i},this.value)"></div>
                         <div class="c-end-group">
                             <span class="label-min">持</span><div class="picker-btn" onclick="openPicker('min','play',${i})">${it.play}</div>
                             <span class="label-min">転</span><div class="picker-btn" onclick="openPicker('min','change',${i})">${it.change}</div>
@@ -212,7 +215,7 @@
                 </div>`;
                 cur += it.play + it.change;
             });
-            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(cur)}</div><div class="c-no">-</div><div class="c-name">顔合わせ <span style="font-size:10px">～10分～</span></div><div class="c-end-group"><div class="c-end">${door}</div></div></div>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(cur)}</div><div class="c-no">-</div><div class="c-name">顔合わせ <span style="font-size:10px">～10分～</span></div><div class="c-end-group"></div></div>`;
         }
         calc();
     }
@@ -223,22 +226,17 @@
     function fmt(min) { return `${Math.floor(min/60).toString().padStart(2,'0')}:${(min%60).toString().padStart(2,'0')}`; }
     function switchTab(t) { currentTab = t; document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.id.includes(t))); render(); }
     function addItem() { data.performance.push({name:"", play:parseInt(bPlay), change:parseInt(bChange)}); data.rehearsal.unshift({name:"", play:20, change:10}); refreshNos(); syncAndCalc(); }
-    
-    // ダイアログなしで削除
-    function del(i) { 
-        data[currentTab].splice(i,1); 
-        let t = currentTab==='performance'?data.rehearsal:data.performance; 
-        t.splice(t.length-1-i,1); 
-        refreshNos(); syncAndCalc(); 
-    }
-    
+    function del(i) { data[currentTab].splice(i,1); let t = currentTab==='performance'?data.rehearsal:data.performance; t.splice(t.length-1-i,1); refreshNos(); syncAndCalc(); }
     function refreshNos() { data.rehearsal.forEach((it,i)=>{ let pI = data.performance.length-i; it.no = (pI===data.performance.length)?"トリ":pI.toString(); }); }
     function applyBatch() { data[currentTab].forEach(it=>{ it.play=parseInt(bPlay); it.change=parseInt(bChange); }); syncAndCalc(); }
     
-    // ダイアログなしでリセット
+    // スマホでも確実にリセットがかかる処理
     function resetData() { 
         localStorage.clear(); 
-        location.reload(); 
+        // 履歴を上書きしてリロード（キャッシュ回避）
+        const url = new URL(window.location.href);
+        url.searchParams.set('r', Date.now());
+        window.location.replace(url.toString());
     }
     
     function toggleTheme() { let t = document.documentElement.dataset.theme==='dark'?'light':'dark'; document.documentElement.dataset.theme=t; localStorage.setItem(K.THEME,t); updateThemeBtn(); }
