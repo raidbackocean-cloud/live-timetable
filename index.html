@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Timetable Pro v33.9</title>
+    <title>Live Timetable Pro v34.0</title>
     <style>
         :root {
             --bg: #f2f2f7; --card: #ffffff; --accent: #007aff;
@@ -26,7 +26,6 @@
         .picker-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1999; }
         .picker-wheels { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
         .wheel { height: 150px; overflow-y: scroll; scroll-snap-type: y mandatory; width: 80px; border: 1px solid var(--bg); border-radius: 8px; scrollbar-width: none; }
-        .wheel::-webkit-scrollbar { display: none; }
         .wheel div { height: 50px; line-height: 50px; text-align: center; scroll-snap-align: center; font-size: 20px; font-weight: bold; color: var(--text); }
         .picker-close { background: var(--accent); color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
 
@@ -45,7 +44,6 @@
         .controls { background: var(--card); border-radius: 12px; padding: 10px; margin-bottom: 8px; font-size: 0.85em; }
         .time-labels { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; align-items: center; }
         .batch-row { display: flex; align-items: center; gap: 5px; color: var(--dim); border-top: 1px solid var(--bg); padding-top: 8px; }
-        
         .btn-apply { background: var(--accent); color: white; border: none; padding: 5px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-left: auto; font-size: 11px; }
         
         .tabs { display: flex; margin-bottom: 2px; }
@@ -62,7 +60,6 @@
         .c-end { font-family: monospace; color: var(--dim); font-size: 0.9em; width: 42px; text-align: right; }
         .btn-add { background: var(--accent); color: white; width: calc(100% - 24px); padding: 16px; border-radius: 14px; font-weight: bold; border: none; position: fixed; bottom: 20px; left: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000; cursor: pointer; }
         .over { background: var(--danger) !important; color: white !important; }
-        .over span, .over div, .over .picker-btn { color: white !important; border-color: white !important; }
         .label-min { font-size: 9px; color: var(--dim); margin-right: 1px; }
     </style>
 </head>
@@ -72,8 +69,7 @@
         <button class="btn-header" onclick="toggleTheme()" id="themeBtn">外観切替</button>
     </div>
     <div class="main-card">
-        <!-- イベント名に例を追加 -->
-        <input type="text" id="evTitle" class="input-title" placeholder="イベント名（例：169Fes Vol.３）">
+        <input type="text" id="evTitle" class="input-title" placeholder="イベント名（例：169Fes Vol.３）" onchange="syncAndCalc()">
         <div class="summary">
             <div class="sum-box"><span>合計</span><div id="totalDisp">00:00</div></div>
             <div class="sum-box"><span>利用可能時間</span><div id="btnLimit" class="picker-btn" onclick="openPicker('time', 'limit')">09:00</div></div>
@@ -140,7 +136,7 @@
             wh.innerHTML = '<div></div>'; for(let i=0;i<24;i++) wh.innerHTML += `<div>${i.toString().padStart(2,'0')}</div>`; wh.innerHTML += '<div></div>';
             wm.innerHTML = '<div></div>'; for(let i=0;i<60;i+=5) wm.innerHTML += `<div>${i.toString().padStart(2,'0')}</div>`; wm.innerHTML += '<div></div>';
             let cur = (key==='door'?door:limit).split(':');
-            wh.scrollTop = parseInt(cur) * 50; wm.scrollTop = (parseInt(cur)/5) * 50;
+            wh.scrollTop = parseInt(cur[0]) * 50; wm.scrollTop = (parseInt(cur[1])/5) * 50;
         } else {
             wheels.innerHTML = `<div id="wheelV" class="wheel" style="width:120px;"></div>`;
             const wv = document.getElementById('wheelV');
@@ -227,10 +223,11 @@
     function fmt(min) { return `${Math.floor(min/60).toString().padStart(2,'0')}:${(min%60).toString().padStart(2,'0')}`; }
     function switchTab(t) { currentTab = t; document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.id.includes(t))); render(); }
     function addItem() { data.performance.push({name:"", play:parseInt(bPlay), change:parseInt(bChange)}); data.rehearsal.unshift({name:"", play:20, change:10}); refreshNos(); syncAndCalc(); }
-    function del(i) { if(confirm('削除？')){ data[currentTab].splice(i,1); let t = currentTab==='performance'?data.rehearsal:data.performance; t.splice(t.length-1-i,1); refreshNos(); syncAndCalc(); } }
+    // 削除時の confirm を削除してサクッと消えるように変更
+    function del(i) { data[currentTab].splice(i,1); let t = currentTab==='performance'?data.rehearsal:data.performance; t.splice(t.length-1-i,1); refreshNos(); syncAndCalc(); }
     function refreshNos() { data.rehearsal.forEach((it,i)=>{ let pI = data.performance.length-i; it.no = (pI===data.performance.length)?"トリ":pI.toString(); }); }
     function applyBatch() { data[currentTab].forEach(it=>{ it.play=parseInt(bPlay); it.change=parseInt(bChange); }); syncAndCalc(); }
-    function resetData() { if(confirm('全消去？')){ localStorage.clear(); location.reload(); } }
+    function resetData() { if(confirm('データを全消去しますか？')){ localStorage.clear(); location.reload(); } }
     function toggleTheme() { let t = document.documentElement.dataset.theme==='dark'?'light':'dark'; document.documentElement.dataset.theme=t; localStorage.setItem(K.THEME,t); updateThemeBtn(); }
     function updateThemeBtn() { document.getElementById('themeBtn').innerText = document.documentElement.dataset.theme==='dark'?'ライト':'ダーク'; }
     init();
