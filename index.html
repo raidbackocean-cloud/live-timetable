@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Timetable Pro v32</title>
+    <title>Live Timetable Pro v33</title>
     <style>
         :root {
             --bg: #f2f2f7; --card: #ffffff; --accent: #007aff;
@@ -14,7 +14,22 @@
             --text: #ffffff; --dim: #98989d; --border: #38383a;
         }
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 12px; line-height: 1.2; padding-bottom: 100px; }
-        input, select { font-size: 16px !important; border: none; background: transparent; color: inherit; outline: none; }
+        
+        /* くるくるボタン（Select）のスタイル */
+        select { 
+            font-size: 16px !important; 
+            border: 1px solid var(--border); 
+            background: var(--bg); 
+            color: var(--accent); 
+            outline: none; 
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-family: monospace;
+            appearance: none; /* デフォルトの矢印を隠す（必要に応じて） */
+            text-align: center;
+        }
+        input { font-size: 16px !important; border: none; background: transparent; color: inherit; outline: none; }
 
         .header { display: flex; justify-content: space-between; margin-bottom: 10px; }
         .btn-header { background: none; border: none; font-size: 0.75em; font-weight: bold; color: var(--dim); cursor: pointer; padding: 5px; }
@@ -25,7 +40,7 @@
         .input-sub { background: var(--bg); padding: 6px 10px; border-radius: 8px; font-size: 12px; }
 
         .summary { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 5px; text-align: center; }
-        .sum-box { background: var(--bg); padding: 6px; border-radius: 10px; }
+        .sum-box { background: var(--bg); padding: 6px; border-radius: 10px; border: 1px solid transparent; }
         .sum-box span { font-size: 9px; color: var(--dim); display: block; font-weight: bold; }
         .sum-box div { font-family: monospace; font-weight: bold; font-size: 1.1em; color: var(--accent); }
 
@@ -38,57 +53,62 @@
         .tab.active { opacity: 1; color: var(--accent); }
 
         .list-container { background: var(--card); border-radius: 0 0 12px 12px; overflow: hidden; }
-        .row { display: flex; padding: 12px 10px; border-bottom: 1px solid var(--bg); align-items: center; position: relative; }
-        .row.sys { background: rgba(0,0,0,0.02); color: var(--dim); font-size: 0.9em; }
+        .row { display: flex; flex-direction: column; padding: 12px 10px; border-bottom: 1px solid var(--bg); position: relative; }
+        .row.sys { flex-direction: row; background: rgba(0,0,0,0.02); color: var(--dim); font-size: 0.9em; align-items: center; }
 
+        .row-main { display: flex; align-items: center; width: 100%; }
         .c-start { width: 45px; font-weight: bold; color: var(--accent); font-family: monospace; font-size: 1.1em; }
-        .c-no { width: 45px; text-align: center; font-size: 0.85em; font-weight: bold; color: var(--dim); white-space: nowrap; overflow: visible; }
+        .c-no { width: 45px; text-align: center; font-size: 0.85em; font-weight: bold; color: var(--dim); white-space: nowrap; }
         .c-name { flex: 1; }
         .c-end { width: 45px; text-align: right; font-family: monospace; color: var(--dim); font-size: 0.9em; }
         .c-del { width: 30px; text-align: right; }
         
         .name-in { width: 100%; font-weight: bold; font-size: 15px; }
-        .param-row { width: 100%; display: flex; gap: 12px; margin-top: 6px; padding-left: 45px; font-size: 0.85em; color: var(--dim); align-items: center; }
+        .param-row { display: flex; gap: 12px; margin-top: 6px; padding-left: 45px; font-size: 0.85em; color: var(--dim); align-items: center; }
         
-        /* くるくる選択（セレクトボックス） */
-        .num-sel { color: var(--accent); font-weight: bold; border-bottom: 1px solid var(--border); }
+        .num-sel { background: var(--bg); border-radius: 4px; padding: 2px 6px; color: var(--accent); font-weight: bold; border: 1px solid var(--border); }
 
         .btn-add { background: var(--accent); color: white; width: calc(100% - 24px); padding: 16px; border-radius: 14px; font-weight: bold; border: none; position: fixed; bottom: 20px; left: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000; }
         .over { background: var(--danger) !important; color: white !important; }
-        .over div, .over span { color: white !important; }
-        .dragging { opacity: 0.3; background: var(--accent) !important; }
+        .over div, .over span, .over select { color: white !important; border-color: white !important; }
+        .meta-text { font-size: 10px; color: var(--dim); margin-left: 5px; }
     </style>
 </head>
-<body>
+<body onclick="syncAndCalc()">
 
     <div class="header">
         <button class="btn-header" onclick="resetData()">リセット</button>
-        <button class="btn-header" onclick="toggleTheme()" id="themeBtn">ダークモード</button>
+        <button class="btn-header" onclick="toggleTheme()" id="themeBtn">外観切替</button>
     </div>
 
-    <div class="main-card">
-        <input type="text" id="evTitle" class="input-title" placeholder="イベント名" oninput="saveInfo()">
+    <div class="main-card" onclick="event.stopPropagation()">
+        <input type="text" id="evTitle" class="input-title" placeholder="イベント名">
         <div class="info-row">
-            <input type="date" id="evDate" class="input-sub" oninput="saveInfo()">
-            <input type="text" id="evPlace" class="input-sub" placeholder="会場" oninput="saveInfo()">
+            <input type="date" id="evDate" class="input-sub">
+            <input type="text" id="evPlace" class="input-sub" placeholder="会場">
         </div>
         <div class="summary">
             <div class="sum-box"><span>合計</span><div id="totalDisp">00:00</div></div>
-            <div class="sum-box"><span>規定</span><div><select id="limH" onchange="saveLimit()"></select>:<select id="limM" onchange="saveLimit()"></select></div></div>
+            <div class="sum-box">
+                <span>規定</span>
+                <div style="display:flex; justify-content:center; align-items:center; gap:2px;">
+                    <select id="limH" onchange="syncAndCalc()"></select>:<select id="limM" onchange="syncAndCalc()"></select>
+                </div>
+            </div>
             <div id="statusBox" class="sum-box"><span id="statusLabel">残り</span><div id="diffDisp">00:00</div></div>
         </div>
     </div>
 
-    <div class="controls">
+    <div class="controls" onclick="event.stopPropagation()">
         <div class="time-labels">
             <div>入り <span id="entryDisp" style="color:var(--accent)">--:--</span></div>
-            <div>開場 <select id="doorH" onchange="saveDoor()"></select>:<select id="doorM" onchange="saveDoor()"></select></div>
+            <div>開場 <select id="doorH" onchange="syncAndCalc()"></select>:<select id="doorM" onchange="syncAndCalc()"></select></div>
             <div>終演 <span id="closeDisp" style="color:var(--accent)">--:--</span></div>
         </div>
         <div class="batch-row">
-            持ち:<select id="bPlay" style="color:var(--accent); font-weight:bold;"></select> 
-            転換:<select id="bChange" style="color:var(--accent); font-weight:bold;"></select>
-            <button onclick="applyBatch()" style="color:var(--accent); font-weight:bold; background:none; margin-left:auto;">一括セット</button>
+            持ち:<select id="bPlay" class="num-sel"></select> 
+            転換:<select id="bChange" class="num-sel"></select>
+            <button onclick="applyBatch()" style="color:var(--accent); font-weight:bold; background:none; border:none; margin-left:auto; cursor:pointer;">一括セット</button>
         </div>
     </div>
 
@@ -98,19 +118,16 @@
     </div>
 
     <div class="list-container">
-        <table style="width:100%"><tbody id="listBody"></tbody></table>
+        <div id="listBody"></div>
     </div>
 
     <button class="btn-add" onclick="addItem()">枠を追加</button>
 
 <script>
-    // キーを v32 に更新
-    const K = { DATA: 'tt_data_v32', INFO: 'tt_info_v32', DOOR: 'tt_door_v32', LIMH: 'tt_h_v32', LIMM: 'tt_m_v32', THEME: 'tt_theme_v32' };
+    const K = { DATA: 'tt_data_v33', INFO: 'tt_info_v33', DOOR: 'tt_door_v33', LIMH: 'tt_h_v33', LIMM: 'tt_m_v33', THEME: 'tt_theme_v33' };
     
     let currentTab = 'performance';
     let door = localStorage.getItem(K.DOOR) || "17:30";
-    let limH = parseInt(localStorage.getItem(K.LIMH)) || 9;
-    let limM = parseInt(localStorage.getItem(K.LIMM)) || 0;
     let data = JSON.parse(localStorage.getItem(K.DATA)) || {
         performance: [{ name: "バンド 1", play: 30, change: 10 }],
         rehearsal: [{ name: "バンド 1", play: 20, change: 10, no: "トリ" }]
@@ -123,7 +140,8 @@
         for(let i=0; i<=120; i+=5){ bp.add(new Option(i+'分',i)); bc.add(new Option(i+'分',i)); }
         
         let [h, m] = door.split(':'); dh.value = h; dm.value = m;
-        lh.value = limH.toString().padStart(2,'0'); lm.value = (Math.round(limM/5)*5).toString().padStart(2,'0');
+        lh.value = localStorage.getItem(K.LIMH) || "09";
+        lm.value = localStorage.getItem(K.LIMM) || "00";
         bp.value = "30"; bc.value = "10";
         
         const info = JSON.parse(localStorage.getItem(K.INFO)) || {};
@@ -137,71 +155,84 @@
     }
 
     function render() {
-        const body = document.getElementById('listBody'); body.innerHTML = "";
+        const container = document.getElementById('listBody'); container.innerHTML = "";
         let [dH, dM] = door.split(':').map(Number);
         
         if (currentTab === 'performance') {
-            body.innerHTML += `<tr class="row sys"><td class="c-start">${door}</td><td class="c-no">-</td><td class="c-name">開場</td><td class="c-end"></td><td class="c-del"></td></tr>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${door}</div><div class="c-no">-</div><div class="c-name">開場</div><div class="c-end"></div></div>`;
             let cur = dH * 60 + dM + 30; 
             data.performance.forEach((it, i) => {
                 let start = fmt(cur), end = fmt(cur + it.play);
-                body.innerHTML += `<tr class="row" draggable="true" data-index="${i}">
-                    <td class="c-start">${start}</td>
-                    <td class="c-no">${(i === data.performance.length-1) ? 'トリ' : i+1}</td>
-                    <td class="c-name"><input type="text" class="name-in" value="${it.name}" placeholder="バンド名" oninput="updValue(${i},'name',this.value)"></td>
-                    <td class="c-end">${end}</td>
-                    <td class="c-del"><button onclick="del(${i})" class="btn-header" style="font-size:1.2em">×</button></td>
-                    <div class="param-row">
+                container.innerHTML += `
+                <div class="row">
+                    <div class="row-main">
+                        <div class="c-start">${start}</div>
+                        <div class="c-no">${(i === data.performance.length-1) ? 'トリ' : i+1}</div>
+                        <div class="c-name"><input type="text" class="name-in" value="${it.name}" placeholder="名称" onchange="updDirect(${i},'name',this.value)"></div>
+                        <div class="c-end">${end}</div>
+                        <div class="c-del"><button onclick="del(${i})" class="btn-header">×</button></div>
+                    </div>
+                    <div class="param-row" onclick="event.stopPropagation()">
                         持ち <select class="num-sel" onchange="upd(${i},'play',this.value)">${optGen(it.play)}</select> 
                         転換 <select class="num-sel" onchange="upd(${i},'change',this.value)">${optGen(it.change)}</select>
                     </div>
-                </tr>`;
+                </div>`;
                 cur += it.play + it.change;
             });
-            body.innerHTML += `<tr class="row sys"><td class="c-start">${fmt(cur)}</td><td class="c-no">-</td><td class="c-name">終演</td><td class="c-end">${fmt(cur+40)}</td><td class="c-del"></td></tr>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(cur)}</div><div class="c-no">-</div><div class="c-name">終演</div><div class="c-end">${fmt(cur+40)}</div></div>`;
             document.getElementById('closeDisp').innerText = fmt(cur + 40);
         } else {
             let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
             let fs = (dH * 60 + dM) - tr;
             document.getElementById('entryDisp').innerText = fmt(fs - 15);
-            body.innerHTML += `<tr class="row sys"><td class="c-start">${fmt(fs-15)}</td><td class="c-no">-</td><td class="c-name">入り <span class="meta-text">～15分～</span></td><td class="c-end">${fmt(fs)}</td><td class="c-del"></td></tr>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(fs-15)}</div><div class="c-no">-</div><div class="c-name">入り <span class="meta-text">～15分～</span></div><div class="c-end">${fmt(fs)}</div></div>`;
             let cur = fs;
             data.rehearsal.forEach((it, i) => {
                 let start = fmt(cur), end = fmt(cur + it.play);
-                body.innerHTML += `<tr class="row" draggable="true" data-index="${i}">
-                    <td class="c-start">${start}</td>
-                    <td class="c-no"><input type="text" value="${it.no||''}" style="width:100%; text-align:center; font-size:11px; font-weight:bold; color:var(--accent)" oninput="updValue(${i},'no',this.value)"></td>
-                    <td class="c-name"><input type="text" class="name-in" value="${it.name}" placeholder="バンド名" oninput="updValue(${i},'name',this.value)"></td>
-                    <td class="c-end">${end}</td>
-                    <td class="c-del"><button onclick="del(${i})" class="btn-header" style="font-size:1.2em">×</button></td>
-                    <div class="param-row">
+                container.innerHTML += `
+                <div class="row">
+                    <div class="row-main">
+                        <div class="c-start">${start}</div>
+                        <div class="c-no"><input type="text" value="${it.no||''}" style="width:100%; text-align:center; font-size:11px; font-weight:bold; color:var(--accent)" onchange="updDirect(${i},'no',this.value)"></div>
+                        <div class="c-name"><input type="text" class="name-in" value="${it.name}" placeholder="名称" onchange="updDirect(${i},'name',this.value)"></div>
+                        <div class="c-end">${end}</div>
+                        <div class="c-del"><button onclick="del(${i})" class="btn-header">×</button></div>
+                    </div>
+                    <div class="param-row" onclick="event.stopPropagation()">
                         持ち <select class="num-sel" onchange="upd(${i},'play',this.value)">${optGen(it.play)}</select> 
                         転換 <select class="num-sel" onchange="upd(${i},'change',this.value)">${optGen(it.change)}</select>
                     </div>
-                </tr>`;
+                </div>`;
                 cur += it.play + it.change;
             });
-            body.innerHTML += `<tr class="row sys"><td class="c-start">${fmt(cur)}</td><td class="c-no">-</td><td class="c-name">顔合わせ <span class="meta-text">～10分～</span></td><td class="c-end">${door}</td><td class="c-del"></td></tr>`;
+            container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(cur)}</div><div class="c-no">-</div><div class="c-name">顔合わせ <span class="meta-text">～10分～</span></div><div class="c-end">${door}</div></div>`;
         }
-        calc(); initDrag();
+        calc();
     }
 
     function optGen(current){ let s=''; for(let i=0; i<=120; i+=5){ s+=`<option value="${i}" ${i==current?'selected':''}>${i}分</option>`; } return s; }
 
-    // 文字入力用（再描画せず保存のみ）
-    function updValue(i, f, v) {
+    function updDirect(i, f, v) {
         data[currentTab][i][f] = v;
         if(f === 'name') {
             if(currentTab === 'performance') { let rI = data.rehearsal.length-1-i; if(data.rehearsal[rI]) data.rehearsal[rI].name = v; }
             else { let pI = data.performance.length-1-i; if(data.performance[pI]) data.performance[pI].name = v; }
         }
-        save();
     }
 
-    // 時間選択用（再描画して時間を計算）
     function upd(i, f, v) {
         data[currentTab][i][f] = parseInt(v) || 0;
-        save(); render();
+        syncAndCalc();
+    }
+
+    function syncAndCalc() {
+        door = document.getElementById('doorH').value + ":" + document.getElementById('doorM').value;
+        localStorage.setItem(K.DATA, JSON.stringify(data));
+        localStorage.setItem(K.DOOR, door);
+        localStorage.setItem(K.LIMH, document.getElementById('limH').value);
+        localStorage.setItem(K.LIMM, document.getElementById('limM').value);
+        localStorage.setItem(K.INFO, JSON.stringify({title:document.getElementById('evTitle').value, date:document.getElementById('evDate').value, place:document.getElementById('evPlace').value}));
+        render();
     }
 
     function calc() {
@@ -218,24 +249,15 @@
     }
 
     function fmt(min) { let h = Math.floor(min/60), m = min%60; return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`; }
-    function save() { localStorage.setItem(K.DATA, JSON.stringify(data)); }
-    function saveInfo() { localStorage.setItem(K.INFO, JSON.stringify({title:document.getElementById('evTitle').value, date:document.getElementById('evDate').value, place:document.getElementById('evPlace').value})); }
-    function saveDoor() { door = document.getElementById('doorH').value + ":" + document.getElementById('doorM').value; localStorage.setItem(K.DOOR, door); render(); }
-    function saveLimit() { localStorage.setItem(K.LIMH, document.getElementById('limH').value); localStorage.setItem(K.LIMM, document.getElementById('limM').value); calc(); }
     function switchTab(t) { currentTab = t; document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.id.includes(t))); render(); }
-    function addItem() { let p = parseInt(document.getElementById('bPlay').value), c = parseInt(document.getElementById('bChange').value); data.performance.push({name:"", play:p, change:c}); data.rehearsal.unshift({name:"", play:20, change:10}); refreshNos(); save(); render(); }
-    function del(i) { if(confirm('削除しますか？')){ data[currentTab].splice(i, 1); if(currentTab==='performance') data.rehearsal.splice(data.rehearsal.length-1-i, 1); else data.performance.splice(data.performance.length-1-i, 1); refreshNos(); save(); render(); } }
+    function addItem() { let p = parseInt(document.getElementById('bPlay').value), c = parseInt(document.getElementById('bChange').value); data.performance.push({name:"", play:p, change:c}); data.rehearsal.unshift({name:"", play:20, change:10}); refreshNos(); syncAndCalc(); }
+    function del(i) { if(confirm('削除しますか？')){ data[currentTab].splice(i, 1); if(currentTab==='performance') data.rehearsal.splice(data.rehearsal.length-1-i, 1); else data.performance.splice(data.performance.length-1-i, 1); refreshNos(); syncAndCalc(); } }
     function refreshNos() { data.rehearsal.forEach((it, i) => { let pI = data.performance.length - i; it.no = (pI === data.performance.length) ? "トリ" : pI.toString(); }); }
-    function applyBatch() { let p = parseInt(document.getElementById('bPlay').value), c = parseInt(document.getElementById('bChange').value); data[currentTab].forEach(it => {it.play=p; it.change=c;}); save(); render(); }
+    function applyBatch() { let p = parseInt(document.getElementById('bPlay').value), c = parseInt(document.getElementById('bChange').value); data[currentTab].forEach(it => {it.play=p; it.change=c;}); syncAndCalc(); }
     function resetData() { if(confirm('全てリセットしますか？')){ localStorage.clear(); location.reload(); } }
     function toggleTheme() { let t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; localStorage.setItem(K.THEME, t); updateThemeBtn(); }
-    function updateThemeBtn() { document.getElementById('themeBtn').innerText = document.documentElement.dataset.theme === 'dark' ? 'ライトモードに切り替え' : 'ダークモードに切り替え'; }
-    function initDrag() {
-        const body = document.getElementById('listBody');
-        body.addEventListener('dragstart', (e) => { if(e.target.closest('tr')) e.target.closest('tr').classList.add('dragging'); });
-        body.addEventListener('dragover', (e) => { e.preventDefault(); const d = document.querySelector('.dragging'); if(!d) return; const r = e.target.closest('tr'); if(r && r!==d && r.dataset.index){ const b = r.getBoundingClientRect(); if(e.clientY - b.top > b.height/2) r.after(d); else r.before(d); } });
-        body.addEventListener('dragend', () => { const rows = Array.from(body.querySelectorAll('tr[data-index]')); if(!rows.length) return; const newData = rows.map(r => data[currentTab][parseInt(r.dataset.index)]); if(currentTab === 'performance'){ data.performance = newData; } else { data.rehearsal = newData; data.performance = [...newData].reverse(); } refreshNos(); save(); render(); });
-    }
+    function updateThemeBtn() { document.getElementById('themeBtn').innerText = document.documentElement.dataset.theme === 'dark' ? 'ライトモード' : 'ダークモード'; }
+    
     init();
 </script>
 </body>
