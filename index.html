@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Timetable Pro v34.2</title>
+    <title>Live Timetable Pro v34.4</title>
     <style>
         :root {
             --bg: #f2f2f7; --card: #ffffff; --accent: #007aff;
             --text: #1c1c1e; --dim: #8e8e93; --border: #d1d1d6; --danger: #ff3b30;
         }
+        /* デフォルトをダークに設定 */
         [data-theme="dark"] {
             --bg: #000000; --card: #1c1c1e; --accent: #0a84ff;
             --text: #ffffff; --dim: #98989d; --border: #38383a;
@@ -35,7 +36,8 @@
         .header { display: flex; justify-content: space-between; margin-bottom: 10px; position: relative; z-index: 10; }
         .btn-header { background: none; border: none; font-size: 0.75em; font-weight: bold; color: var(--dim); cursor: pointer; padding: 10px 5px; }
         .main-card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .input-title { font-size: 1.3em !important; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid var(--bg) !important; }
+        .input-title { font-size: 1.3em !important; color: var(--accent); margin-bottom: 4px; border-bottom: 1px solid var(--bg) !important; }
+        .guide-text { font-size: 10px; color: var(--dim); margin-bottom: 12px; font-weight: bold; }
         
         .summary { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 5px; text-align: center; }
         .sum-box { background: var(--bg); padding: 6px; border-radius: 10px; min-height: 45px; display: flex; flex-direction: column; justify-content: center; }
@@ -63,13 +65,14 @@
         .label-min { font-size: 9px; color: var(--dim); margin-right: 1px; }
     </style>
 </head>
-<body>
+<body data-theme="dark">
     <div class="header">
         <button class="btn-header" onclick="resetData()">リセット</button>
-        <button class="btn-header" onclick="toggleTheme()" id="themeBtn">外観切替</button>
+        <button class="btn-header" onclick="toggleTheme()" id="themeBtn">ライトモード</button>
     </div>
     <div class="main-card">
         <input type="text" id="evTitle" class="input-title" placeholder="イベント名（例：169Fes Vol.３）" onchange="syncAndCalc()">
+        <div class="guide-text">まずは利用可能時間と開場時間を入力してください</div>
         <div class="summary">
             <div class="sum-box"><span>合計</span><div id="totalDisp">00:00</div></div>
             <div class="sum-box"><span>利用可能時間</span><div id="btnLimit" class="picker-btn" onclick="openPicker('time', 'limit')">09:00</div></div>
@@ -107,7 +110,6 @@
     let door = localStorage.getItem(K.DOOR) || "17:30", limit = localStorage.getItem(K.LIM) || "09:00";
     let bPlay = localStorage.getItem(K.BPLAY) || 30, bChange = localStorage.getItem(K.BCHANGE) || 10;
     
-    // 初期データの定義
     const initialData = {
         performance: Array.from({length:3}, (_,i)=>({name:`バンド ${i+1}`, play:30, change:10})),
         rehearsal: Array.from({length:3}, (_,i)=>({name:`バンド ${i+1}`, play:20, change:10, no:(3-i).toString()}))
@@ -123,8 +125,19 @@
         document.getElementById('btnLimit').innerText = limit;
         document.getElementById('btnBatchPlay').innerText = bPlay+"分";
         document.getElementById('btnBatchChange').innerText = bChange+"分";
-        document.documentElement.dataset.theme = localStorage.getItem(K.THEME) || 'light';
-        updateThemeBtn(); render();
+        // デフォルトをダークにするロジック
+        const savedTheme = localStorage.getItem(K.THEME) || 'dark';
+        document.body.dataset.theme = savedTheme;
+        updateThemeBtn();
+        calcEntryTime();
+        render();
+    }
+
+    function calcEntryTime() {
+        let [dH, dM] = door.split(':').map(Number);
+        let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
+        let fs = (dH * 60 + dM) - tr;
+        document.getElementById('entryDisp').innerText = fmt(fs-15);
     }
 
     function openPicker(type, key, idx = null) {
@@ -170,6 +183,7 @@
     function render() {
         const container = document.getElementById('listBody'); container.innerHTML = "";
         let [dH, dM] = door.split(':').map(Number);
+        calcEntryTime();
         if (currentTab === 'performance') {
             container.innerHTML += `<div class="row sys"><div class="c-start">${door}</div><div class="c-no">-</div><div class="c-name">開場</div><div class="c-end-group"></div></div>`;
             let cur = dH * 60 + dM + 30; 
@@ -195,7 +209,6 @@
         } else {
             let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
             let fs = (dH * 60 + dM) - tr;
-            document.getElementById('entryDisp').innerText = fmt(fs-15);
             container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(fs-15)}</div><div class="c-no">-</div><div class="c-name">入り <span style="font-size:10px">～15分～</span></div><div class="c-end-group"></div></div>`;
             let cur = fs;
             data.rehearsal.forEach((it, i) => {
@@ -229,18 +242,18 @@
     function del(i) { data[currentTab].splice(i,1); let t = currentTab==='performance'?data.rehearsal:data.performance; t.splice(t.length-1-i,1); refreshNos(); syncAndCalc(); }
     function refreshNos() { data.rehearsal.forEach((it,i)=>{ let pI = data.performance.length-i; it.no = (pI===data.performance.length)?"トリ":pI.toString(); }); }
     function applyBatch() { data[currentTab].forEach(it=>{ it.play=parseInt(bPlay); it.change=parseInt(bChange); }); syncAndCalc(); }
+    function resetData() { localStorage.clear(); const url = new URL(window.location.href); url.searchParams.set('r', Date.now()); window.location.replace(url.toString()); }
     
-    // スマホでも確実にリセットがかかる処理
-    function resetData() { 
-        localStorage.clear(); 
-        // 履歴を上書きしてリロード（キャッシュ回避）
-        const url = new URL(window.location.href);
-        url.searchParams.set('r', Date.now());
-        window.location.replace(url.toString());
+    function toggleTheme() { 
+        let t = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; 
+        document.body.dataset.theme = t; 
+        localStorage.setItem(K.THEME, t); 
+        updateThemeBtn(); 
     }
-    
-    function toggleTheme() { let t = document.documentElement.dataset.theme==='dark'?'light':'dark'; document.documentElement.dataset.theme=t; localStorage.setItem(K.THEME,t); updateThemeBtn(); }
-    function updateThemeBtn() { document.getElementById('themeBtn').innerText = document.documentElement.dataset.theme==='dark'?'ライト':'ダーク'; }
+    function updateThemeBtn() { 
+        const isDark = document.body.dataset.theme === 'dark';
+        document.getElementById('themeBtn').innerText = isDark ? 'ライトモード' : 'ダークモード'; 
+    }
     init();
 </script>
 </body>
