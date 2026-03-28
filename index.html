@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Live Timetable Pro v34.4</title>
+    <title>Live Timetable Pro v35.1</title>
     <style>
         :root {
             --bg: #f2f2f7; --card: #ffffff; --accent: #007aff;
             --text: #1c1c1e; --dim: #8e8e93; --border: #d1d1d6; --danger: #ff3b30;
         }
-        /* デフォルトをダークに設定 */
         [data-theme="dark"] {
             --bg: #000000; --card: #1c1c1e; --accent: #0a84ff;
             --text: #ffffff; --dim: #98989d; --border: #38383a;
@@ -31,7 +30,7 @@
         .picker-close { background: var(--accent); color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
 
         input[type="text"] { border: none; background: transparent; font-size: 15px; color: inherit; outline: none; width: 100%; font-weight: bold; }
-        ::placeholder { color: var(--dim); opacity: 0.6; font-weight: normal; }
+        ::placeholder { color: var(--dim); opacity: 0.5; font-weight: normal; }
 
         .header { display: flex; justify-content: space-between; margin-bottom: 10px; position: relative; z-index: 10; }
         .btn-header { background: none; border: none; font-size: 0.75em; font-weight: bold; color: var(--dim); cursor: pointer; padding: 10px 5px; }
@@ -48,10 +47,18 @@
         .batch-row { display: flex; align-items: center; gap: 5px; color: var(--dim); border-top: 1px solid var(--bg); padding-top: 8px; }
         .btn-apply { background: var(--accent); color: white; border: none; padding: 5px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-left: auto; font-size: 11px; }
         
-        .tabs { display: flex; margin-bottom: 2px; }
-        .tab { flex: 1; padding: 10px; border: none; background: var(--card); color: var(--dim); font-weight: bold; border-radius: 10px 10px 0 0; opacity: 0.5; cursor: pointer; }
-        .tab.active { opacity: 1; color: var(--accent); }
-        .list-container { background: var(--card); border-radius: 0 0 12px 12px; overflow: hidden; }
+        .tabs { display: flex; margin-bottom: 0px; gap: 4px; }
+        .tab { 
+            flex: 1; padding: 12px; border: none; background: #3a3a3c; color: #8e8e93; 
+            font-weight: 800; border-radius: 10px 10px 0 0; cursor: pointer; 
+            transition: 0.2s; font-size: 14px;
+        }
+        .tab.active { 
+            background: var(--accent); color: white; opacity: 1;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        }
+
+        .list-container { background: var(--card); border-radius: 0 0 12px 12px; overflow: hidden; border-top: 2px solid var(--accent); }
         .row { padding: 10px; border-bottom: 1px solid var(--bg); }
         .row.sys { display: flex; background: rgba(0,0,0,0.02); color: var(--dim); font-size: 0.85em; align-items: center; }
         .row-main { display: flex; align-items: center; width: 100%; height: 32px; }
@@ -110,9 +117,10 @@
     let door = localStorage.getItem(K.DOOR) || "17:30", limit = localStorage.getItem(K.LIM) || "09:00";
     let bPlay = localStorage.getItem(K.BPLAY) || 30, bChange = localStorage.getItem(K.BCHANGE) || 10;
     
+    // バンド名の初期値を完全に空("")に設定
     const initialData = {
-        performance: Array.from({length:3}, (_,i)=>({name:`バンド ${i+1}`, play:30, change:10})),
-        rehearsal: Array.from({length:3}, (_,i)=>({name:`バンド ${i+1}`, play:20, change:10, no:(3-i).toString()}))
+        performance: Array.from({length:3}, (_,i)=>({name:"", play:30, change:10})),
+        rehearsal: Array.from({length:3}, (_,i)=>({name:"", play:20, change:10, no:(3-i).toString()}))
     };
     initialData.rehearsal[initialData.rehearsal.length-1].no = "トリ";
 
@@ -125,7 +133,6 @@
         document.getElementById('btnLimit').innerText = limit;
         document.getElementById('btnBatchPlay').innerText = bPlay+"分";
         document.getElementById('btnBatchChange').innerText = bChange+"分";
-        // デフォルトをダークにするロジック
         const savedTheme = localStorage.getItem(K.THEME) || 'dark';
         document.body.dataset.theme = savedTheme;
         updateThemeBtn();
@@ -135,7 +142,7 @@
 
     function calcEntryTime() {
         let [dH, dM] = door.split(':').map(Number);
-        let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
+        let tr = 10; data.rehearsal.forEach((it) => tr += (it.play || 0) + (it.change || 0));
         let fs = (dH * 60 + dM) - tr;
         document.getElementById('entryDisp').innerText = fmt(fs-15);
     }
@@ -193,7 +200,7 @@
                     <div class="row-main">
                         <div class="c-start">${s}</div>
                         <div class="c-no">${(i===data.performance.length-1)?'トリ':i+1}</div>
-                        <div class="c-name"><input type="text" value="${it.name||''}" onchange="updName(${i},this.value)"></div>
+                        <div class="c-name"><input type="text" value="${it.name||''}" placeholder="バンド ${i+1}" onchange="updName(${i},this.value)"></div>
                         <div class="c-end-group">
                             <span class="label-min">持</span><div class="picker-btn" onclick="openPicker('min','play',${i})">${it.play}</div>
                             <span class="label-min">転</span><div class="picker-btn" onclick="openPicker('min','change',${i})">${it.change}</div>
@@ -207,7 +214,7 @@
             container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(cur)}</div><div class="c-no">-</div><div class="c-name">終演</div><div class="c-end-group"><div class="c-end">${fmt(cur+40)}</div></div></div>`;
             document.getElementById('closeDisp').innerText = fmt(cur+40);
         } else {
-            let tr = 10; data.rehearsal.forEach((it, i) => tr += it.play + (i < data.rehearsal.length-1 ? it.change : 0));
+            let tr = 10; data.rehearsal.forEach((it) => tr += (it.play || 0) + (it.change || 0));
             let fs = (dH * 60 + dM) - tr;
             container.innerHTML += `<div class="row sys"><div class="c-start">${fmt(fs-15)}</div><div class="c-no">-</div><div class="c-name">入り <span style="font-size:10px">～15分～</span></div><div class="c-end-group"></div></div>`;
             let cur = fs;
@@ -217,7 +224,7 @@
                     <div class="row-main">
                         <div class="c-start">${s}</div>
                         <div class="c-no"><input type="text" value="${it.no||''}" style="width:100%;text-align:center;font-size:11px;color:var(--accent);font-weight:bold" onchange="data.rehearsal[${i}].no=this.value;syncAndCalc()"></div>
-                        <div class="c-name"><input type="text" value="${it.name||''}" onchange="updName(${i},this.value)"></div>
+                        <div class="c-name"><input type="text" value="${it.name||''}" placeholder="バンド ${data.rehearsal.length - i}" onchange="updName(${i},this.value)"></div>
                         <div class="c-end-group">
                             <span class="label-min">持</span><div class="picker-btn" onclick="openPicker('min','play',${i})">${it.play}</div>
                             <span class="label-min">転</span><div class="picker-btn" onclick="openPicker('min','change',${i})">${it.change}</div>
@@ -243,17 +250,8 @@
     function refreshNos() { data.rehearsal.forEach((it,i)=>{ let pI = data.performance.length-i; it.no = (pI===data.performance.length)?"トリ":pI.toString(); }); }
     function applyBatch() { data[currentTab].forEach(it=>{ it.play=parseInt(bPlay); it.change=parseInt(bChange); }); syncAndCalc(); }
     function resetData() { localStorage.clear(); const url = new URL(window.location.href); url.searchParams.set('r', Date.now()); window.location.replace(url.toString()); }
-    
-    function toggleTheme() { 
-        let t = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; 
-        document.body.dataset.theme = t; 
-        localStorage.setItem(K.THEME, t); 
-        updateThemeBtn(); 
-    }
-    function updateThemeBtn() { 
-        const isDark = document.body.dataset.theme === 'dark';
-        document.getElementById('themeBtn').innerText = isDark ? 'ライトモード' : 'ダークモード'; 
-    }
+    function toggleTheme() { let t = document.body.dataset.theme === 'dark' ? 'light' : 'dark'; document.body.dataset.theme = t; localStorage.setItem(K.THEME, t); updateThemeBtn(); }
+    function updateThemeBtn() { const isDark = document.body.dataset.theme === 'dark'; document.getElementById('themeBtn').innerText = isDark ? 'ライトモード' : 'ダークモード'; }
     init();
 </script>
 </body>
